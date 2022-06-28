@@ -26,6 +26,8 @@ ZP_PTR_2    = $FD
 SCREEN_RAM  = $0400
 SPRITE_PTRS = SCREEN_RAM | $03F8
 
+INTRO_DELAY = 120
+
 tove_sprite_colors:
 .byte 8,7,8,7,5,8,5
 
@@ -38,13 +40,21 @@ tove_sprite_xy:
 .byte 104,131
 .byte 100,131
 
-
 title_str:
 .byte LOWER_CASE,GREEN_CHAR,"slithy",RETURN
 .res LEFT_MARGIN,SPACE
 .byte BLACK_CHAR,"GAMES",RETURN,RETURN
 .res LEFT_MARGIN,SPACE
 .byte RED_CHAR,"PRESENTS",RETURN,RETURN,0
+
+target_clock:
+.res 3
+
+kernal_irq:
+.res 2
+
+start_mug:
+.byte 0
 
 start:
    lda #1
@@ -93,11 +103,78 @@ start:
    cpx #14
    bne @coord_loop
 
+   ; wait for INTRO_DELAY jiffies
+   clc
+   lda TIME+2
+   adc INTRO_DELAY
+   sta target_clock+2
+   lda TIME+1
+   adc #0
+   sta target_clock+1
+   lda TIME
+   adc #0
+   sta target_clock
+
+   ; backup RAM vector for kernal IRQ routine
+   lda IRQVec
+   sta kernal_irq
+   lda IRQVec+1
+   sta kernal_irq+1
+
+   ; overwrite IRQ vector
+   sei
+   lda #<custom_irq
+   sta IRQVec
+   lda #>custom_irq
+   sta IRQVec+1
+   cli
+
+   ; wait for start_mug flag to be set
+@wait_mug:
+   lda start_mug
+   beq @wait_mug
+
+   ; load mug screen
+   lda #0
+   sta VIC_BORDERCOLOR
+   sta VIC_BG_COLOR0
+   sta VIC_SPR_ENA
+   lda #CLR_CHAR
+   jsr CHROUT
 
 
+forever:
+   nop
+   jmp forever
+
+   
+
+custom_irq:
+
+   lda start_mug
+   bne @animation
+   lda TIME
+   cmp target_clock
+   bne @done
+   lda TIME+1
+   cmp target_clock+1
+   bne @done
+   lda TIME+2
+   cmp target_clock+2
+   bne @done
+   lda #1
+   sta start_mug
+   jmp @done
+@animation:
+   jsr mug_tick
+@done:
+   jmp (kernal_irq)
+   ; end
+
+mug_tick:
 
    rts
-
+   
 
 .res $2000-*
 .org $2000
