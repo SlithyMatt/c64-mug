@@ -26,7 +26,9 @@ ZP_PTR_2    = $FD
 SCREEN_RAM  = $0400
 SPRITE_PTRS = SCREEN_RAM | $03F8
 
-INTRO_DELAY = 120
+COLOR_RAM   = $D800
+
+INTRO_DELAY = 180
 
 tove_sprite_colors:
 .byte 8,7,8,7,5,8,5
@@ -106,7 +108,7 @@ start:
    ; wait for INTRO_DELAY jiffies
    clc
    lda TIME+2
-   adc INTRO_DELAY
+   adc #INTRO_DELAY
    sta target_clock+2
    lda TIME+1
    adc #0
@@ -139,8 +141,37 @@ start:
    sta VIC_BORDERCOLOR
    sta VIC_BG_COLOR0
    sta VIC_SPR_ENA
-   lda #CLR_CHAR
-   jsr CHROUT
+   lda CIA2_PRA
+   and #$FE ; VIC Bank 1
+   sta CIA2_PRA
+   lda #$80 ; Bitmap at $4000, Colors at $6000
+   sta VIC_VIDEO_ADR
+   lda VIC_CTRL1
+   ora #$20 ; enable bitmap mode
+   sta VIC_CTRL1
+   lda VIC_CTRL2
+   ora #$10 ; enable multi-color mode
+   sta VIC_CTRL2
+
+   ldy #0
+   sty ZP_PTR_1
+   lda #>bitmap_colors2
+   sta ZP_PTR_1+1
+   sty ZP_PTR_2
+   lda #>COLOR_RAM
+   sta ZP_PTR_2+1
+
+@color_loop:
+   lda (ZP_PTR_1),y
+   sta (ZP_PTR_2),y
+   iny
+   bne @color_loop
+   inc ZP_PTR_1+1
+   inc ZP_PTR_2+1
+   lda ZP_PTR_2+1
+   cmp #>CIA1
+   bne @color_loop
+
 
 
 forever:
@@ -348,4 +379,7 @@ tove_sprite6:
 .byte %00000000,%00000000,%00000000
 .byte 0 ; spacer
 
+.res $4000-*
+.org $4000
+.include "bitmap.asm"
 
