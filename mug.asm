@@ -29,6 +29,7 @@ SPRITE_PTRS = SCREEN_RAM | $03F8
 COLOR_RAM   = $D800
 
 INTRO_DELAY = 180
+TITLE_DELAY = 120
 
 tove_sprite_colors:
 .byte 8,7,8,7,5,8,5
@@ -58,6 +59,9 @@ kernal_irq:
 start_mug:
 .byte 0
 
+show_title:
+.byte 0
+
 start:
    lda #1
    sta VIC_BORDERCOLOR
@@ -80,9 +84,9 @@ start:
    sta VIC_SPR_MCOLOR
    sta VIC_SPR_EXP_Y
    sta VIC_SPR_ENA
-   lda #15
+   lda #15 ; light gray
    sta VIC_SPR_MCOLOR0
-   lda #9
+   lda #9  ; brown
    sta VIC_SPR_MCOLOR1
    ldx #0
    stx VIC_SPR_HI_X
@@ -160,7 +164,6 @@ start:
    sty ZP_PTR_2
    lda #>COLOR_RAM
    sta ZP_PTR_2+1
-
 @color_loop:
    lda (ZP_PTR_1),y
    sta (ZP_PTR_2),y
@@ -172,7 +175,52 @@ start:
    cmp #>CIA1
    bne @color_loop
 
+   clc
+   lda TIME+2
+   adc #TITLE_DELAY
+   sta target_clock+2
+   lda TIME+1
+   adc #0
+   sta target_clock+1
+   lda TIME
+   adc #0
+   sta target_clock 
 
+   lda #0 ; black
+   sta VIC_SPR_MCOLOR0
+   lda #3  ; cyan
+   sta VIC_SPR_MCOLOR1
+
+   lda #2 ; red
+   sta VIC_SPR0_COLOR   ; spr0 = mug
+   lda #8 ; orange
+   sta VIC_SPR1_COLOR   ; spr1 = beer
+
+wait_title:
+   lda show_title
+   beq wait_title
+
+   lda #$A0 ; Bitmap at $4000, Colors at $6800
+   sta VIC_VIDEO_ADR
+
+   ldy #0
+   sty ZP_PTR_1
+   lda #>bitmap_colors2_title
+   sta ZP_PTR_1+1
+   sty ZP_PTR_2
+   lda #>COLOR_RAM
+   sta ZP_PTR_2+1
+@color_loop:
+   lda (ZP_PTR_1),y
+   sta (ZP_PTR_2),y
+   iny
+   bne @color_loop
+   inc ZP_PTR_1+1
+   inc ZP_PTR_2+1
+   lda ZP_PTR_2+1
+   cmp #>CIA1
+   bne @color_loop
+   
 
 forever:
    nop
@@ -197,6 +245,19 @@ custom_irq:
    sta start_mug
    jmp @done
 @animation:
+   lda TIME
+   cmp target_clock
+   bne @do_tick
+   lda TIME+1
+   cmp target_clock+1
+   bne @do_tick
+   lda TIME+2
+   cmp target_clock+2
+   bne @do_tick
+   lda #1
+   sta show_title
+   jmp @done
+@do_tick:
    jsr mug_tick
 @done:
    jmp (kernal_irq)
@@ -208,7 +269,6 @@ mug_tick:
    
 
 .res $2000-*
-.org $2000
 ; Sprites
 tove_sprite0:
 .byte %00000000,%00000000,%00000001
@@ -380,6 +440,32 @@ tove_sprite6:
 .byte 0 ; spacer
 
 .res $4000-*
-.org $4000
 .include "bitmap.asm"
 
+.res $7000-*
+mug_sprite:
+.byte %00000000,%00000101,%01010000
+.byte %00000000,%00010000,%00000100
+.byte %00000000,%01000000,%00000001
+.byte %00000000,%01000100,%00010001
+.byte %00000101,%01000101,%01010001
+.byte %00011111,%01111100,%00000001
+.byte %01111101,%01110000,%00000001
+.byte %01110100,%01100000,%00001001
+.byte %01110100,%01101000,%00101001
+.byte %01110100,%01101010,%10101001
+.byte %01110100,%01101010,%10101001
+.byte %01111101,%01111100,%00101001
+.byte %00011111,%01100000,%00001001
+.byte %00000101,%01000000,%00000001
+.byte %00000000,%01000100,%00010001
+.byte %00000000,%01000100,%00010001
+.byte %00000000,%01000000,%00000001
+.byte %00000000,%00010000,%00000100
+.byte %00000000,%00000101,%01010000
+.byte %00000000,%00000000,%00000000
+.byte %00000000,%00000000,%00000000
+.byte 0 ; spacer
+
+beer_sprite:
+.res 63,0
