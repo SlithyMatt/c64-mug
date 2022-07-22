@@ -26,6 +26,9 @@ ZP_PTR_2    = $FD
 SCREEN_RAM  = $0400
 SPRITE_PTRS = SCREEN_RAM | $03F8
 
+SPRITE1_PTRS = bitmap_colors1 | $03F8
+SPRITE2_PTRS = bitmap_colors1_title | $03F8
+
 COLOR_RAM   = $D800
 
 INTRO_DELAY = 180
@@ -145,6 +148,7 @@ start:
    sta VIC_BORDERCOLOR
    sta VIC_BG_COLOR0
    sta VIC_SPR_ENA
+   sta VIC_SPR_EXP_Y
    lda CIA2_PRA
    and #$FE ; VIC Bank 1
    sta CIA2_PRA
@@ -198,35 +202,36 @@ start:
    lda #9 ; brown
    sta VIC_SPR2_COLOR   ; spr2 = tap handle
 
-   ldx #>((mug_sprite & $3E00) << 2) ; spr0 address
-   stx SPRITE_PTRS
+   ldx #>((mug_sprite & $3FC0) << 2) ; spr0 address
+   stx SPRITE1_PTRS
    inx
-   stx SPRITE_PTRS+1
+   stx SPRITE1_PTRS+1
    inx
-   stx SPRITE_PTRS+2
+   stx SPRITE1_PTRS+2
 
-   ; mug @ 40,104
-   lda #40
+   ; mug @ 54,154
+   lda #54
    sta VIC_SPR0_X
-   lda #104
+   lda #154
    sta VIC_SPR0_Y
 
-   ; beer @ 260,101
-   lda #4
+   ; beer @ 273,153
+   lda #17
    sta VIC_SPR1_X
-   lda VIC_SPR_HI_X
-   ora #$01
-   sta VIC_SPR_HI_X
-   lda #101
-   sta VIC_SPR1_Y
-
-   ; handle @ 257,79
-   lda #1
-   sta VIC_SPR2_X
    lda VIC_SPR_HI_X
    ora #$02
    sta VIC_SPR_HI_X
-   lda #79
+   lda #153
+   sta VIC_SPR1_Y
+
+   ; orig: handle @ 257,79
+   ; handle @ 270,131
+   lda #14
+   sta VIC_SPR2_X
+   lda VIC_SPR_HI_X
+   ora #$04
+   sta VIC_SPR_HI_X
+   lda #131
    sta VIC_SPR2_Y
 
    ; enable sprites
@@ -239,6 +244,13 @@ wait_title:
 
    lda #$A0 ; Bitmap at $4000, Colors at $6800
    sta VIC_VIDEO_ADR
+
+   ldx #>((mug_sprite & $3FC0) << 2) ; spr0 address
+   stx SPRITE2_PTRS
+   inx
+   stx SPRITE2_PTRS+1
+   inx
+   stx SPRITE2_PTRS+2
 
    ldy #0
    sty ZP_PTR_1
@@ -257,6 +269,7 @@ wait_title:
    lda ZP_PTR_2+1
    cmp #>CIA1
    bne @color_loop
+   
    
 
 forever:
@@ -301,7 +314,7 @@ custom_irq:
    ; end
 
 mug_tick:
-
+   inc VIC_SPR0_X
    rts
    
 
@@ -481,20 +494,20 @@ tove_sprite6:
 
 .res $7000-*
 mug_sprite:
-.byte %00000000,%00000101,%01010000
-.byte %00000000,%00010000,%00000100
-.byte %00000000,%01000000,%00000001
-.byte %00000000,%01000100,%00010001
-.byte %00000101,%01000101,%01010001
-.byte %00011111,%01111100,%00000001
-.byte %01111101,%01110000,%00000001
-.byte %01110100,%01100000,%00001001
-.byte %01110100,%01101000,%00101001
-.byte %01110100,%01101010,%10101001
-.byte %01110100,%01101010,%10101001
-.byte %01111101,%01111100,%00101001
-.byte %00011111,%01100000,%00001001
-.byte %00000101,%01000000,%00000001
+.byte %00000000,%00001111,%11110000
+.byte %00000000,%00110000,%00001100
+.byte %00000000,%11000000,%00000011
+.byte %00000000,%11110000,%00001111
+.byte %00000000,%11111111,%11110011
+.byte %00001111,%11111100,%00000011
+.byte %00001101,%11110000,%00000011
+.byte %00001100,%11100000,%00001011
+.byte %00001100,%11101000,%00101011
+.byte %00001100,%01101010,%10101001
+.byte %00001100,%01101010,%10101001
+.byte %00001100,%01101000,%00101001
+.byte %00001111,%01100000,%00001001
+.byte %00000001,%01000000,%00000001
 .byte %00000000,%01000100,%00010001
 .byte %00000000,%01000100,%00010001
 .byte %00000000,%01000000,%00000001
