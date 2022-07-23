@@ -32,7 +32,9 @@ SPRITE2_PTRS = bitmap_colors1_title | $03F8
 COLOR_RAM   = $D800
 
 INTRO_DELAY = 180
-TITLE_DELAY = 120
+TITLE_DELAY = 150
+
+MAX_MUG_X   = 270
 
 tove_sprite_colors:
 .byte 8,7,8,7,5,8,5
@@ -63,6 +65,12 @@ start_mug:
 .byte 0
 
 show_title:
+.byte 0
+
+slow_tick:
+.byte 0
+
+beer_frame:
 .byte 0
 
 start:
@@ -209,14 +217,14 @@ start:
    inx
    stx SPRITE1_PTRS+2
 
-   ; mug @ 54,154
+   ; mug @ 54,156
    lda #54
    sta VIC_SPR0_X
-   lda #154
+   lda #156
    sta VIC_SPR0_Y
 
-   ; beer @ 273,153
-   lda #17
+   ; beer @ MAX_MUG_X-2,153
+   lda #<(MAX_MUG_X-2)
    sta VIC_SPR1_X
    lda VIC_SPR_HI_X
    ora #$02
@@ -224,7 +232,6 @@ start:
    lda #153
    sta VIC_SPR1_Y
 
-   ; orig: handle @ 257,79
    ; handle @ 270,131
    lda #14
    sta VIC_SPR2_X
@@ -279,7 +286,6 @@ forever:
    
 
 custom_irq:
-
    lda start_mug
    bne @animation
    lda TIME
@@ -314,7 +320,70 @@ custom_irq:
    ; end
 
 mug_tick:
+   lda VIC_SPR_HI_X
+   and #$01
+   beq @next
+   lda VIC_SPR0_X
+   cmp #<MAX_MUG_X
+   beq @handle_down
+@next:
    inc VIC_SPR0_X
+   inc VIC_SPR0_X
+   bne @return
+   lda VIC_SPR_HI_X
+   ora #$01
+   sta VIC_SPR_HI_X
+   jmp @return
+@handle_down:
+   inc slow_tick
+   lda #$01
+   bit slow_tick
+   bne @return
+   lda beer_frame
+   bne @check_poured
+   lda #>((handle_on_sprite & $3FC0) << 2) ; spr2 address
+   sta SPRITE1_PTRS+2
+   ldx #2
+   lda #%00000010
+@init_beer_loop:
+   sta beer_sprite,x
+   inx
+   inx
+   inx
+   cpx #65
+   bne @init_beer_loop
+   lda beer_frame
+@check_poured:
+   cmp #13
+   beq @poured
+   lda #20
+   sec
+   sbc beer_frame
+   sta ZP_PTR_1 ; A = beer line, use ZP for scratch
+   asl
+   adc ZP_PTR_1
+   tax
+   inx   ; X = beer line * 3 + 1
+   lda #%00001010
+   sta beer_sprite,x
+   lda #%10101010
+   inx
+   sta beer_sprite,x
+   inc beer_frame
+   jmp @return
+@poured:
+   lda #>((handle_off_sprite & $3FC0) << 2) ; spr2 address
+   sta SPRITE1_PTRS+2
+   ldx #2
+   lda #0
+@clear_pour_loop:
+   sta beer_sprite,x
+   inx
+   inx
+   inx
+   cpx #26
+   bne @clear_pour_loop
+@return:
    rts
    
 
